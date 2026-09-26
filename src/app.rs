@@ -84,7 +84,7 @@ enum Message {
     PanelConfig(CosmicPanelConfig),
     DockConfig(CosmicPanelConfig),
     Ignore,
-    Surface(surface::Action),
+    Surface(surface::Action<Message>),
     PopupSize(SurfaceId, iced::Size),
 }
 
@@ -814,7 +814,17 @@ impl cosmic::Application for CosmicNotifications {
                 return Task::batch(tasks);
             }
             Message::Config(config) => {
+                let dnd_turned_on = config.do_not_disturb && !self.config.do_not_disturb;
                 self.config = config;
+                if dnd_turned_on && !self.cards.is_empty() {
+                    let ids: Vec<u32> = self.cards.iter().map(|n| n.id).collect();
+                    let mut tasks: Vec<_> = ids.into_iter().map(|id| self.expire(id)).collect();
+                    if self.active_surface {
+                        self.active_surface = false;
+                        tasks.push(destroy_layer_surface(self.window_id));
+                    }
+                    return Task::batch(tasks);
+                }
             }
             Message::PanelConfig(c) => {
                 self.panel_config = c;
@@ -826,9 +836,7 @@ impl cosmic::Application for CosmicNotifications {
             }
             Message::Ignore => {}
             Message::Surface(a) => {
-                return cosmic::task::message(cosmic::Action::Cosmic(
-                    cosmic::app::Action::Surface(a),
-                ));
+                return cosmic::task::message(cosmic::Action::Surface(a));
             }
             Message::PopupSize(id, mut size) => {
                 let Some(p) = self.popups.iter_mut().find(|p| p.0 == id) else {
