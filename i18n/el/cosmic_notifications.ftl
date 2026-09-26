@@ -1,1 +1,1 @@
-app-name = Ειδοποιήσεις COSMIC
+app-name = Ειδοποιήσεις WMDE
